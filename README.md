@@ -44,13 +44,17 @@ sudo apt install -y \
 
 如果当前用户没有 sudo 权限，请让服务器管理员安装上述依赖。
 
-## 当前便携版 exe
+## 下载使用
+
+普通用户不需要安装 Node.js，也不需要自己构建项目。请在 GitHub Releases 下载最新版 Windows 便携版 exe：
 
 ```text
-apps/desktop/release/Remote-Terminal-Manager-0.1.0-portable-x64-native-scale.exe
+https://github.com/你的用户名/你的仓库名/releases/latest
 ```
 
-> 注意：`release/` 目录中的 exe 属于构建产物，默认不上传 GitHub。建议在 GitHub Releases 页面单独发布 exe。
+下载 `Remote-Terminal-Manager-*.exe` 后双击运行即可。
+
+> 说明：`apps/desktop/release/` 中的 exe 是本地构建产物，默认不提交到 Git 仓库。正式分发时请把 exe 上传到 GitHub Releases，README 中提供 Releases 下载入口。
 
 ## 完整使用说明
 
@@ -88,6 +92,33 @@ cmd /c npm.cmd run build
 ```powershell
 cmd /c npm.cmd run package:win
 ```
+
+打包后，本地 exe 会出现在：
+
+```text
+apps/desktop/release/
+```
+
+该目录已被 `.gitignore` 排除，不会进入 Git 历史。发布新版时，请把生成的 exe 上传到 GitHub Releases。
+
+## 发布 exe 到 GitHub Releases
+
+首次推送源码到 GitHub 后，可以在 GitHub 网页端发布 exe：
+
+1. 打开仓库页面。
+2. 点击右侧或顶部的 `Releases`。
+3. 点击 `Draft a new release`。
+4. 新建 tag，例如 `v0.1.0`。
+5. 标题填写 `Remote Terminal Manager v0.1.0`。
+6. 上传本地生成的 exe，例如：
+
+```text
+apps/desktop/release/Remote-Terminal-Manager-0.1.0-portable-x64-native-scale.exe
+```
+
+7. 点击 `Publish release`。
+
+之后用户就可以通过 `releases/latest` 下载图形界面软件。
 
 ## 建议上传到 GitHub 的内容
 
