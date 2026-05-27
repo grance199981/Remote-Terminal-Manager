@@ -1,0 +1,39 @@
+# Dependencies and package-manager caches
+node_modules/
+**/node_modules/
+.npm-cache/
+
+# Build outputs
+dist/
+**/dist/
+dist-electron/
+release/
+**/release/
+.vite/
+.vite-temp/
+**/.vite-temp/
+*.tsbuildinfo
+
+# Runtime logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+devices.json
+*.pem
+*.key
+*.ppk
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/

@@ -1,0 +1,18 @@
+{
+  "name": "remote-control-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Self-hosted remote SSH and terminal manager MVP.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/desktop run dev",
+    "build": "npm --workspace apps/desktop run build",
+    "typecheck": "npm --workspace apps/desktop run typecheck",
+    "package:win": "npm --workspace apps/desktop run dist:win"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

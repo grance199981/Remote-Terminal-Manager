@@ -50,6 +50,8 @@ sudo apt install -y \
 apps/desktop/release/Remote-Terminal-Manager-0.1.0-portable-x64-native-scale.exe
 ```
 
+> 注意：`release/` 目录中的 exe 属于构建产物，默认不上传 GitHub。建议在 GitHub Releases 页面单独发布 exe。
+
 ## 完整使用说明
 
 请打开：
@@ -85,4 +87,47 @@ cmd /c npm.cmd run build
 
 ```powershell
 cmd /c npm.cmd run package:win
+```
+
+## 建议上传到 GitHub 的内容
+
+应该上传：
+
+- `README.md`
+- `.gitignore`
+- `package.json`
+- `package-lock.json`
+- `apps/desktop/package.json`
+- `apps/desktop/src/**`
+- `apps/desktop/scripts/**`
+- `apps/desktop/index.html`
+- `apps/desktop/tsconfig.json`
+- `apps/desktop/tsconfig.main.json`
+- `apps/desktop/vite.config.ts`
+- `docs/**`
+
+不建议上传：
+
+- `node_modules/`
+- `.npm-cache/`
+- `apps/desktop/dist/`
+- `apps/desktop/release/`
+- `apps/desktop/node_modules/`
+- `.env`、私钥、密码文件、本地设备配置文件
+- 各类日志文件和系统临时文件
+
+## 首次推送到 GitHub
+
+在 GitHub 新建空仓库后，在本地执行：
+
+```powershell
+git remote add origin https://github.com/你的用户名/你的仓库名.git
+git branch -M main
+git push -u origin main
+```
+
+之后可以直接使用界面里的“推送”，或者执行：
+
+```powershell
+git push
 ```

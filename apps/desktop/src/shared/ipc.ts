@@ -1,0 +1,23 @@
+export const IPC = {
+  DEVICES_LIST: "devices:list",
+  DEVICES_SAVE: "devices:save",
+  DEVICES_DELETE: "devices:delete",
+  DEVICES_TEST: "devices:test",
+  LOCAL_LIST: "local:list",
+  SFTP_LIST: "sftp:list",
+  SFTP_UPLOAD: "sftp:upload",
+  SFTP_DOWNLOAD: "sftp:download",
+  SFTP_MKDIR: "sftp:mkdir",
+  SFTP_DELETE: "sftp:delete",
+  DESKTOP_TEST: "desktop:test",
+  DESKTOP_START: "desktop:start",
+  DESKTOP_INSTALL: "desktop:install",
+  DESKTOP_TUNNEL: "desktop:tunnel",
+  TERMINAL_CREATE: "terminal:create",
+  TERMINAL_INPUT: "terminal:input",
+  TERMINAL_RESIZE: "terminal:resize",
+  TERMINAL_CLOSE: "terminal:close",
+  TERMINAL_DATA: "terminal:data",
+  TERMINAL_EXIT: "terminal:exit",
+  TERMINAL_ERROR: "terminal:error"
+} as const;
