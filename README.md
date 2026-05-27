@@ -49,7 +49,7 @@ sudo apt install -y \
 普通用户不需要安装 Node.js，也不需要自己构建项目。请在 GitHub Releases 下载最新版 Windows 便携版 exe：
 
 ```text
-https://github.com/你的用户名/你的仓库名/releases/latest
+https://github.com/grance199981/Remote-Terminal-Manager/releases/latest
 ```
 
 下载 `Remote-Terminal-Manager-*.exe` 后双击运行即可。
@@ -152,7 +152,7 @@ apps/desktop/release/Remote-Terminal-Manager-0.1.0-portable-x64-native-scale.exe
 在 GitHub 新建空仓库后，在本地执行：
 
 ```powershell
-git remote add origin https://github.com/你的用户名/你的仓库名.git
+git remote add origin https://github.com/grance199981/Remote-Terminal-Manager.git
 git branch -M main
 git push -u origin main
 ```

@@ -32,7 +32,7 @@ apps/desktop/release/Remote-Terminal-Manager-0.1.0-portable-x64-native-scale.exe
 如果是第一次推送：
 
 ```powershell
-git remote add origin https://github.com/你的用户名/你的仓库名.git
+git remote add origin https://github.com/grance199981/Remote-Terminal-Manager.git
 git branch -M main
 git push -u origin main
 ```
@@ -58,7 +58,7 @@ git push
 README 中可以使用这个链接指向最新版：
 
 ```text
-https://github.com/你的用户名/你的仓库名/releases/latest
+https://github.com/grance199981/Remote-Terminal-Manager/releases/latest
 ```
 
 也可以使用相对链接：
