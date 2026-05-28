@@ -9,6 +9,8 @@ dist/
 dist-electron/
 release/
 **/release/
+release-*/
+**/release-*/
 .vite/
 .vite-temp/
 **/.vite-temp/

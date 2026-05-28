@@ -1,5 +1,6 @@
 import { Client } from "ssh2";
 import { readFileSync } from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import { randomUUID } from "node:crypto";
 import type {
@@ -128,6 +129,17 @@ export async function openRemoteDesktopTunnel(
   });
   tunnels.set(id, { id, server, localPort });
   const url = buildMinimalNoVncUrl("127.0.0.1", localPort);
+  try {
+    await waitForHttpOk(url, 10000);
+  } catch (error) {
+    tunnels.delete(id);
+    server.close();
+    throw new Error(
+      `SSH tunnel opened, but noVNC did not return a page through the tunnel: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
   return {
     ok: true,
     host: "127.0.0.1",
@@ -155,7 +167,6 @@ function buildStartCommand(options: {
 set -e
 read -r VNC_PASSWORD || true
 WS_BIN=$(command -v websock''ify || true)
-WS_PATTERN='[w]ebsock''ify'
 if [ -z "$WS_BIN" ]; then
   echo "websockify not found. Install with: sudo apt install -y novnc websockify"
   exit 2
@@ -169,6 +180,22 @@ if [ -z "$WEB_ROOT" ]; then
   echo "noVNC web root not found. Install with: sudo apt install -y novnc websockify"
   exit 2
 fi
+kill_listeners_on_port() {
+  PORT="$1"
+  PIDS=$(ss -ltnp 2>/dev/null | awk -v suffix=":$PORT" '$4 ~ suffix"$" {print}' | sed -n 's/.*pid=\\([0-9][0-9]*\\).*/\\1/p' | sort -u)
+  for pid in $PIDS; do
+    [ "$pid" = "$$" ] && continue
+    echo "killing listener pid=$pid on port $PORT"
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+  sleep 1
+  PIDS=$(ss -ltnp 2>/dev/null | awk -v suffix=":$PORT" '$4 ~ suffix"$" {print}' | sed -n 's/.*pid=\\([0-9][0-9]*\\).*/\\1/p' | sort -u)
+  for pid in $PIDS; do
+    [ "$pid" = "$$" ] && continue
+    echo "force killing listener pid=$pid on port $PORT"
+    kill -9 "$pid" >/dev/null 2>&1 || true
+  done
+}
 APP_WEB_ROOT="$HOME/.remote-terminal-novnc-web"
 mkdir -p "$APP_WEB_ROOT"
 rm -rf "$APP_WEB_ROOT/core" "$APP_WEB_ROOT/vendor"
@@ -304,6 +331,7 @@ XVNCL_PATTERN='[X]vnc'
 if ss -ltn | awk '{print $4}' | grep -Eq '(:|\\])${options.vncPort}$'; then
   echo "VNC display :${options.display} is already listening; restarting it to apply XFCE xstartup"
   vncserver -kill :${options.display} >/dev/null 2>&1 || true
+  kill_listeners_on_port ${options.vncPort}
   for pid in $(pgrep -f "$XVNC_PATTERN.*:${options.display}" 2>/dev/null); do [ "$pid" = "$$" ] && continue; kill "$pid" >/dev/null 2>&1 || true; done
   for pid in $(pgrep -f "$XVNCL_PATTERN.*:${options.display}" 2>/dev/null); do [ "$pid" = "$$" ] && continue; kill "$pid" >/dev/null 2>&1 || true; done
   for pid in $(pgrep -f '[r]emote-terminal-vnc-session-${options.display}' 2>/dev/null); do [ "$pid" = "$$" ] && continue; kill "$pid" >/dev/null 2>&1 || true; done
@@ -331,17 +359,29 @@ else
   vncserver :${options.display} -geometry ${options.width}x${options.height} -depth ${options.depth} -xstartup "$HOME/.vnc/xstartup"
 fi
 if ss -ltn | awk '{print $4}' | grep -Eq '(:|\\])${options.noVncPort}$'; then
-  echo "noVNC port ${options.noVncPort} is already listening; trying to restart matching proxy process"
-  for pid in $(pgrep -f "$WS_PATTERN.*${options.noVncPort}" 2>/dev/null); do [ "$pid" = "$$" ] && continue; kill "$pid" >/dev/null 2>&1 || true; done
+  echo "noVNC port ${options.noVncPort} is already listening; restarting listener process"
+  kill_listeners_on_port ${options.noVncPort}
   sleep 1
 fi
 if ss -ltn | awk '{print $4}' | grep -Eq '(:|\\])${options.noVncPort}$'; then
-  echo "port ${options.noVncPort} is still in use; keeping existing listener"
+  echo "port ${options.noVncPort} is still in use after restart attempt"
+  exit 2
 else
   nohup "$WS_BIN" --web="$WEB_ROOT" 0.0.0.0:${options.noVncPort} localhost:${options.vncPort} > ${logFile} 2>&1 &
   echo "started noVNC pid=$! port=${options.noVncPort} -> localhost:${options.vncPort} web=$WEB_ROOT"
   sleep 1
 fi
+python3 - <<'PY'
+import urllib.request
+url = 'http://127.0.0.1:${options.noVncPort}/remote.html?path=websockify'
+try:
+    with urllib.request.urlopen(url, timeout=8) as response:
+        response.read(64)
+        print('local noVNC HTTP health check OK:', response.status)
+except Exception as exc:
+    print('local noVNC HTTP health check failed:', repr(exc))
+    raise SystemExit(2)
+PY
 REMOTE_IP=$(hostname -I | awk '{print $1}')
 echo "URL: http://$REMOTE_IP:${options.noVncPort}/vnc_lite.html?host=$REMOTE_IP&port=${options.noVncPort}&path=websockify&autoconnect=true&resize=scale"
 `)
@@ -416,6 +456,24 @@ function listenLocal(server: net.Server): Promise<number> {
       }
       resolve(address.port);
     });
+  });
+}
+
+function waitForHttpOk(url: string, timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = http.get(url, { timeout: timeoutMs }, (response) => {
+      response.resume();
+      if (response.statusCode && response.statusCode >= 200 && response.statusCode < 400) {
+        resolve();
+      } else {
+        reject(new Error(`HTTP ${response.statusCode ?? "unknown"}`));
+      }
+    });
+
+    request.once("timeout", () => {
+      request.destroy(new Error(`timeout after ${timeoutMs}ms`));
+    });
+    request.once("error", reject);
   });
 }
 
