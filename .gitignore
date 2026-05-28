@@ -29,6 +29,7 @@ pnpm-debug.log*
 !.env.example
 *.local
 devices.json
+.installers/
 *.pem
 *.key
 *.ppk
