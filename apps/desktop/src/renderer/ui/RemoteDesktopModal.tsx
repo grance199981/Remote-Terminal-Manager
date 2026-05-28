@@ -48,9 +48,9 @@ interface SavedDesktopConfig {
 const DEFAULT_CONFIG: SavedDesktopConfig = {
   noVncPort: 6080,
   vncDisplay: 1,
-  width: 1920,
-  height: 1080,
-  depth: 24
+  width: 1280,
+  height: 720,
+  depth: 16
 };
 
 export function RemoteDesktopModal({ device, onClose }: RemoteDesktopModalProps) {

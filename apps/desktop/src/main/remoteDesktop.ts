@@ -180,6 +180,19 @@ if [ -z "$WEB_ROOT" ]; then
   echo "noVNC web root not found. Install with: sudo apt install -y novnc websockify"
   exit 2
 fi
+http_health_ok() {
+  PORT="$1"
+  python3 - "$PORT" <<'PY' >/dev/null 2>&1
+import sys, urllib.request
+port = sys.argv[1]
+try:
+    with urllib.request.urlopen(f'http://127.0.0.1:{port}/remote.html?path=websockify', timeout=4) as response:
+        response.read(64)
+        raise SystemExit(0 if 200 <= response.status < 400 else 1)
+except Exception:
+    raise SystemExit(1)
+PY
+}
 kill_listeners_on_port() {
   PORT="$1"
   PIDS=$(ss -ltnp 2>/dev/null | awk -v suffix=":$PORT" '$4 ~ suffix"$" {print}' | sed -n 's/.*pid=\\([0-9][0-9]*\\).*/\\1/p' | sort -u)
@@ -211,6 +224,7 @@ cat > "$APP_WEB_ROOT/remote.html" <<'REMOTEHTML'
   <style>
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #030712; }
     #screen { position: fixed; inset: 0; width: 100vw; height: 100vh; overflow: hidden; display: block; background: #030712; }
+    #screen canvas { outline: none; }
     #screen canvas { display: block; }
     #status { position: fixed; left: 8px; top: 8px; z-index: 10; padding: 8px 10px; border-radius: 8px; color: #e5e7eb; background: rgba(2, 6, 23, .88); font: 14px system-ui, sans-serif; }
     #credentials { position: fixed; inset: 0; display: none; place-items: center; z-index: 20; background: rgba(2, 6, 23, .72); font: 14px system-ui, sans-serif; }
@@ -245,16 +259,18 @@ cat > "$APP_WEB_ROOT/remote.html" <<'REMOTEHTML'
     const rfb = new RFB(screen, url, initialPassword ? { credentials: { password: initialPassword } } : {});
 
     rfb.scaleViewport = true;
-    rfb.resizeSession = true;
+    rfb.resizeSession = false;
     rfb.showDotCursor = true;
     rfb.clipViewport = false;
     rfb.focusOnClick = true;
+    rfb.compressionLevel = 9;
+    rfb.qualityLevel = 4;
 
     const applyNativeFit = () => {
       try {
         rfb.clipViewport = false;
         rfb.scaleViewport = true;
-        rfb.resizeSession = true;
+        rfb.resizeSession = false;
       } catch {}
     };
     const scheduleNativeFit = () => [80, 250, 750, 1500, 3000].forEach((delay) => setTimeout(applyNativeFit, delay));
@@ -328,16 +344,12 @@ fi
 XVNC_BIN=$(command -v Xtiger''vnc || true)
 XVNC_PATTERN='[X]tiger''vnc'
 XVNCL_PATTERN='[X]vnc'
+VNC_ALREADY_RUNNING=0
 if ss -ltn | awk '{print $4}' | grep -Eq '(:|\\])${options.vncPort}$'; then
-  echo "VNC display :${options.display} is already listening; restarting it to apply XFCE xstartup"
-  vncserver -kill :${options.display} >/dev/null 2>&1 || true
-  kill_listeners_on_port ${options.vncPort}
-  for pid in $(pgrep -f "$XVNC_PATTERN.*:${options.display}" 2>/dev/null); do [ "$pid" = "$$" ] && continue; kill "$pid" >/dev/null 2>&1 || true; done
-  for pid in $(pgrep -f "$XVNCL_PATTERN.*:${options.display}" 2>/dev/null); do [ "$pid" = "$$" ] && continue; kill "$pid" >/dev/null 2>&1 || true; done
-  for pid in $(pgrep -f '[r]emote-terminal-vnc-session-${options.display}' 2>/dev/null); do [ "$pid" = "$$" ] && continue; kill "$pid" >/dev/null 2>&1 || true; done
-  sleep 1
+  VNC_ALREADY_RUNNING=1
+  echo "VNC display :${options.display} is already listening on port ${options.vncPort}; reusing the existing desktop session for stability"
 fi
-if [ -n "$XVNC_BIN" ]; then
+if [ "$VNC_ALREADY_RUNNING" = "0" ] && [ -n "$XVNC_BIN" ]; then
   if [ ! -f "$HOME/.vnc/passwd" ]; then
     echo "VNC password file ~/.vnc/passwd was not found. Enter the SSH/VNC password and start again."
     exit 2
@@ -355,17 +367,25 @@ if [ -n "$XVNC_BIN" ]; then
   fi
   nohup bash -lc 'export DISPLAY=:${options.display}; exec -a remote-terminal-vnc-session-${options.display} "$HOME/.vnc/xstartup"' > "$HOME/.vnc/remote-terminal-session-${options.display}.log" 2>&1 &
   echo "started XFCE/xstartup pid=$!"
-else
+elif [ "$VNC_ALREADY_RUNNING" = "0" ]; then
   vncserver :${options.display} -geometry ${options.width}x${options.height} -depth ${options.depth} -xstartup "$HOME/.vnc/xstartup"
 fi
 if ss -ltn | awk '{print $4}' | grep -Eq '(:|\\])${options.noVncPort}$'; then
-  echo "noVNC port ${options.noVncPort} is already listening; restarting listener process"
-  kill_listeners_on_port ${options.noVncPort}
-  sleep 1
+  if http_health_ok ${options.noVncPort}; then
+    echo "noVNC port ${options.noVncPort} is already listening and HTTP health check is OK; reusing listener"
+  else
+    echo "noVNC port ${options.noVncPort} is listening but HTTP health check failed; restarting listener process"
+    kill_listeners_on_port ${options.noVncPort}
+    sleep 1
+  fi
 fi
 if ss -ltn | awk '{print $4}' | grep -Eq '(:|\\])${options.noVncPort}$'; then
-  echo "port ${options.noVncPort} is still in use after restart attempt"
-  exit 2
+  if http_health_ok ${options.noVncPort}; then
+    :
+  else
+    echo "port ${options.noVncPort} is still in use but noVNC HTTP is unhealthy"
+    exit 2
+  fi
 else
   nohup "$WS_BIN" --web="$WEB_ROOT" 0.0.0.0:${options.noVncPort} localhost:${options.vncPort} > ${logFile} 2>&1 &
   echo "started noVNC pid=$! port=${options.noVncPort} -> localhost:${options.vncPort} web=$WEB_ROOT"
