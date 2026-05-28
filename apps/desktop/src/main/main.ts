@@ -141,7 +141,14 @@ function registerIpc() {
   });
   ipcMain.handle(IPC.DESKTOP_OPEN_CLIENT, async (_event, request: RemoteDesktopConfig) => {
     const device = await requireSshDevice(request.deviceId);
-    return openRemoteDesktopClient(device, request);
+    try {
+      return await openRemoteDesktopClient(device, request);
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error)
+      };
+    }
   });
 
   ipcMain.handle(IPC.TERMINAL_CREATE, async (_event, request: TerminalCreateRequest) => {

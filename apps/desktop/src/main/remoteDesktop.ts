@@ -582,15 +582,25 @@ function resolveExistingPath(preferred: string | undefined, label: string, candi
   }
   for (const candidate of candidates.filter(Boolean)) {
     if (candidate.endsWith(".exe") && candidate.includes(":") && !existsSync(candidate)) continue;
+    if (!looksLikeAbsoluteWindowsPath(candidate) && !commandExistsOnPath(candidate)) continue;
     return candidate;
   }
   throw new Error(
-    `${label} executable was not found. Install ${label} or fill its .exe path in Advanced Settings.`
+    `${label} executable was not found on this Windows computer. Install ${label}, or fill its .exe path in Advanced Settings.`
   );
 }
 
 function looksLikeAbsoluteWindowsPath(value: string) {
   return /^[a-zA-Z]:[\\/]/.test(value);
+}
+
+function commandExistsOnPath(command: string) {
+  const pathEnv = process.env.PATH ?? "";
+  const extensions = command.toLowerCase().endsWith(".exe") ? [""] : ["", ".exe"];
+  return pathEnv
+    .split(";")
+    .filter(Boolean)
+    .some((dir) => extensions.some((extension) => existsSync(path.join(dir, command + extension))));
 }
 
 function createRdpFile(host: string, port: number, request: RemoteDesktopConfig) {

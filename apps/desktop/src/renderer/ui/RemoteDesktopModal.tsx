@@ -37,7 +37,10 @@ const UI = {
   installing: "\u6b63\u5728\u901a\u8fc7 sudo \u5b89\u88c5 Ubuntu \u684c\u9762\u4f9d\u8d56\uff0c\u53ef\u80fd\u9700\u8981\u51e0\u5206\u949f...",
   opened: "\u5df2\u6253\u5f00\u8fdc\u7a0b\u684c\u9762\u753b\u9762",
   connected: "\u5df2\u8fde\u63a5\u8fdc\u7a0b\u684c\u9762",
-  installHint: "\u82e5\u542f\u52a8\u5931\u8d25\uff0c\u9700\u8981\u7ba1\u7406\u5458\u5728 Ubuntu \u4e0a\u5b89\u88c5\uff1asudo apt install -y xfce4 xfce4-goodies tigervnc-standalone-server tigervnc-common novnc websockify dbus-x11 xterm"
+  installHint: "\u82e5\u542f\u52a8\u5931\u8d25\uff0c\u9700\u8981\u7ba1\u7406\u5458\u5728 Ubuntu \u4e0a\u5b89\u88c5\uff1asudo apt install -y xfce4 xfce4-goodies tigervnc-standalone-server tigervnc-common novnc websockify dbus-x11 xterm",
+  moonlightHint: "Moonlight 方案需要在本机 Windows 安装 Moonlight 客户端，并在 Ubuntu 服务器安装/启动 Sunshine 且完成配对；Ubuntu 上安装 noVNC 包不会安装 Moonlight.exe。",
+  rustDeskHint: "RustDesk 方案需要在本机 Windows 安装 RustDesk 客户端，并在 Ubuntu 服务器安装 RustDesk；Ubuntu 上安装 noVNC 包不会安装 rustdesk.exe。",
+  xrdpHint: "xRDP 方案使用 Windows 自带远程桌面；如卡顿，建议降低分辨率到 1280x720 或 1024x576，并关闭 Ubuntu 远程桌面的动画/透明效果。"
 };
 
 interface RemoteDesktopModalProps {
@@ -124,7 +127,7 @@ export function RemoteDesktopModal({ device, onClose }: RemoteDesktopModalProps)
       setStatus(result.message);
       if (!result.ok) setError(result.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(cleanErrorMessage(err));
       setStatus("\u6253\u5f00\u5ba2\u6237\u7aef\u5931\u8d25");
     } finally {
       setBusy(false);
@@ -313,7 +316,7 @@ export function RemoteDesktopModal({ device, onClose }: RemoteDesktopModalProps)
               <input
                 value={config.rustDeskId}
                 onChange={(event) => setConfig((current) => ({ ...current, rustDeskId: event.target.value }))}
-                placeholder="\u670d\u52a1\u5668 RustDesk ID"
+                placeholder="服务器 RustDesk ID"
               />
             </label>
           ) : (
@@ -382,7 +385,7 @@ export function RemoteDesktopModal({ device, onClose }: RemoteDesktopModalProps)
                 <button className="secondary" onClick={() => void installAndStart()} disabled={busy || !canUseSsh}>{UI.install}</button>
               </>
             ) : config.backend === "xrdp" ? (
-              <p className="desktop-hint">Ubuntu \u7aef\u9700\u8981\u7ba1\u7406\u5458\u5b89\u88c5\uff1a<code>sudo apt install -y xrdp xfce4 xfce4-goodies dbus-x11</code>\uff0c\u5e76\u786e\u4fdd Tailscale ACL \u5141\u8bb8 3389\u3002</p>
+              <p className="desktop-hint">Ubuntu 端需要管理员安装：<code>sudo apt install -y xrdp xfce4 xfce4-goodies dbus-x11</code>，并确保 Tailscale ACL 允许 3389。</p>
             ) : config.backend === "rustdesk" ? (
               <>
                 <label>
@@ -393,7 +396,7 @@ export function RemoteDesktopModal({ device, onClose }: RemoteDesktopModalProps)
                     placeholder="C:\\Program Files\\RustDesk\\rustdesk.exe"
                   />
                 </label>
-                <p className="desktop-hint">RustDesk \u9700\u8981\u670d\u52a1\u5668\u548c\u672c\u673a\u90fd\u5b89\u88c5 RustDesk\uff0c\u670d\u52a1\u5668\u4e0a\u767b\u5f55\u6216\u8bb0\u5f55 ID \u540e\u4f7f\u7528\u3002</p>
+                <p className="desktop-hint">RustDesk 需要服务器和本机都安装 RustDesk，服务器上登录或记录 ID 后使用。</p>
               </>
             ) : (
               <>
@@ -405,7 +408,7 @@ export function RemoteDesktopModal({ device, onClose }: RemoteDesktopModalProps)
                     placeholder="C:\\Program Files\\Moonlight Game Streaming\\Moonlight.exe"
                   />
                 </label>
-                <p className="desktop-hint">Sunshine + Moonlight \u9700\u8981\u5148\u5728 Ubuntu \u4e0a\u542f\u52a8 Sunshine \u5e76\u4e0e\u672c\u673a Moonlight \u914d\u5bf9\uff0c\u4e4b\u540e\u518d\u4ece\u8fd9\u91cc\u542f\u52a8\u3002</p>
+                <p className="desktop-hint">Sunshine + Moonlight 需要先在 Ubuntu 上启动 Sunshine，并与本机 Windows Moonlight 客户端配对，之后再从这里启动。</p>
               </>
             )}
           </div>
@@ -416,7 +419,7 @@ export function RemoteDesktopModal({ device, onClose }: RemoteDesktopModalProps)
           <code>{viewerUrl || directUrl}</code>
         </div>
 
-        {error ? <div className="error-banner desktop-error">{error}<br />{UI.installHint}</div> : null}
+        {error ? <div className="error-banner desktop-error">{error}<br />{desktopErrorHint(config.backend)}</div> : null}
 
         {advancedOpen && output ? (
           <details className="desktop-log">
@@ -482,4 +485,18 @@ function saveConfig(deviceId: string, config: SavedDesktopConfig) {
 
 function storageKey(deviceId: string) {
   return `remote-desktop:${deviceId}`;
+}
+
+function desktopErrorHint(backend: RemoteDesktopBackend) {
+  if (backend === "moonlight") return UI.moonlightHint;
+  if (backend === "rustdesk") return UI.rustDeskHint;
+  if (backend === "xrdp") return UI.xrdpHint;
+  return UI.installHint;
+}
+
+function cleanErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^Error:\s*/i, "");
 }
