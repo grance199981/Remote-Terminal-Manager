@@ -254,10 +254,10 @@ export function RemoteDesktopModal({ device, onClose }: RemoteDesktopModalProps)
                 setStatus(backend === "novnc" ? UI.ready : UI.externalReady);
               }}
             >
-              <option value="xrdp">xRDP / Windows Remote Desktop\uff08\u63a8\u8350\uff09</option>
-              <option value="moonlight">Sunshine + Moonlight\uff08\u9ad8\u6027\u80fd\uff09</option>
-              <option value="rustdesk">RustDesk\uff08\u5916\u90e8\u5ba2\u6237\u7aef\uff09</option>
-              <option value="novnc">noVNC\uff08\u5185\u5d4c\u5907\u7528\uff09</option>
+              <option value="xrdp">xRDP / Windows Remote Desktop（推荐）</option>
+              <option value="moonlight">Sunshine + Moonlight（高性能）</option>
+              <option value="rustdesk">RustDesk（外部客户端）</option>
+              <option value="novnc">noVNC（内嵌备用）</option>
             </select>
           </label>
 

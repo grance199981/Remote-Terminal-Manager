@@ -1,9 +1,11 @@
 import { Client } from "ssh2";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import http from "node:http";
 import net from "node:net";
+import path from "node:path";
+import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type {
   Device,
@@ -100,21 +102,23 @@ export async function openRemoteDesktopClient(
 
   if (backend === "xrdp") {
     const port = normalizePort(request.rdpPort ?? 3389, 3389);
-    launchDetached("mstsc.exe", [`/v:${host}:${port}`]);
+    const rdpFile = createRdpFile(host, port, request);
+    await launchDetached("mstsc.exe", [rdpFile]);
     return {
       ok: true,
-      message: `Opened Microsoft Remote Desktop: ${host}:${port}. On Ubuntu install and enable xrdp first.`
+      message: `Opened Microsoft Remote Desktop with a performance profile: ${host}:${port}.`
     };
   }
 
   if (backend === "rustdesk") {
-    const exe = resolveExistingPath(request.rustDeskPath, [
+    const exe = resolveExistingPath(request.rustDeskPath, "RustDesk", [
       "C:\\Program Files\\RustDesk\\rustdesk.exe",
       "C:\\Program Files (x86)\\RustDesk\\rustdesk.exe",
+      process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Programs\\RustDesk\\rustdesk.exe` : "",
       "rustdesk.exe"
     ]);
     const args = request.rustDeskId?.trim() ? [request.rustDeskId.trim()] : [];
-    launchDetached(exe, args);
+    await launchDetached(exe, args);
     return {
       ok: true,
       message: request.rustDeskId?.trim()
@@ -124,14 +128,15 @@ export async function openRemoteDesktopClient(
   }
 
   if (backend === "moonlight") {
-    const exe = resolveExistingPath(request.moonlightPath, [
+    const exe = resolveExistingPath(request.moonlightPath, "Moonlight", [
       "C:\\Program Files\\Moonlight Game Streaming\\Moonlight.exe",
       "C:\\Program Files (x86)\\Moonlight Game Streaming\\Moonlight.exe",
+      process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Programs\\Moonlight Game Streaming\\Moonlight.exe` : "",
       "Moonlight.exe"
     ]);
     const appName = request.moonlightApp?.trim() || "Desktop";
     const args = ["stream", host, appName];
-    launchDetached(exe, args);
+    await launchDetached(exe, args);
     return {
       ok: true,
       message: `Opened Moonlight stream request: ${host} / ${appName}. Pair Moonlight with Sunshine first.`
@@ -550,22 +555,72 @@ function waitForHttpOk(url: string, timeoutMs: number): Promise<void> {
   });
 }
 
-function launchDetached(command: string, args: string[]) {
-  const child = spawn(command, args, {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: false
+function launchDetached(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: false
+    });
+    child.once("spawn", () => {
+      child.unref();
+      resolve();
+    });
+    child.once("error", (error) => {
+      reject(new Error(`Unable to launch ${command}: ${error.message}`));
+    });
   });
-  child.unref();
 }
 
-function resolveExistingPath(preferred: string | undefined, candidates: string[]) {
-  if (preferred?.trim()) return preferred.trim();
-  for (const candidate of candidates) {
+function resolveExistingPath(preferred: string | undefined, label: string, candidates: string[]) {
+  if (preferred?.trim()) {
+    const value = preferred.trim();
+    if (looksLikeAbsoluteWindowsPath(value) && !existsSync(value)) {
+      throw new Error(`${label} executable was not found at: ${value}`);
+    }
+    return value;
+  }
+  for (const candidate of candidates.filter(Boolean)) {
     if (candidate.endsWith(".exe") && candidate.includes(":") && !existsSync(candidate)) continue;
     return candidate;
   }
-  return candidates[candidates.length - 1];
+  throw new Error(
+    `${label} executable was not found. Install ${label} or fill its .exe path in Advanced Settings.`
+  );
+}
+
+function looksLikeAbsoluteWindowsPath(value: string) {
+  return /^[a-zA-Z]:[\\/]/.test(value);
+}
+
+function createRdpFile(host: string, port: number, request: RemoteDesktopConfig) {
+  const width = clampInt(request.width, 800, 7680, 1280);
+  const height = clampInt(request.height, 600, 4320, 720);
+  const depth = clampInt(request.depth, 15, 32, 16);
+  const file = path.join(tmpdir(), `remote-terminal-${host.replace(/[^a-zA-Z0-9.-]/g, "_")}-${randomUUID()}.rdp`);
+  const content = [
+    `full address:s:${host}:${port}`,
+    "screen mode id:i:2",
+    `desktopwidth:i:${width}`,
+    `desktopheight:i:${height}`,
+    `session bpp:i:${depth}`,
+    "compression:i:1",
+    "networkautodetect:i:1",
+    "bandwidthautodetect:i:1",
+    "connection type:i:6",
+    "bitmapcachepersistenable:i:1",
+    "disable wallpaper:i:1",
+    "disable full window drag:i:1",
+    "disable menu anims:i:1",
+    "disable themes:i:0",
+    "allow font smoothing:i:0",
+    "audiomode:i:2",
+    "redirectclipboard:i:1",
+    "authentication level:i:2",
+    "prompt for credentials:i:1"
+  ].join("\r\n");
+  writeFileSync(file, content, "utf8");
+  return file;
 }
 
 function buildNoVncUrl(host: string, port: number) {
