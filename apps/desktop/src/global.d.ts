@@ -49,6 +49,7 @@ declare global {
         start(request: RemoteDesktopConfig): Promise<RemoteDesktopStartResult>;
         install(request: RemoteDesktopConfig): Promise<RemoteDesktopStartResult>;
         tunnel(request: RemoteDesktopConfig): Promise<RemoteDesktopStartResult>;
+        openClient(request: RemoteDesktopConfig): Promise<OperationResult>;
       };
       terminals: {
         create(request: TerminalCreateRequest): Promise<TerminalCreateResponse>;

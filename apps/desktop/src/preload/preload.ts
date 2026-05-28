@@ -32,7 +32,8 @@ contextBridge.exposeInMainWorld("remoteTerminal", {
     test: (request: RemoteDesktopConfig) => ipcRenderer.invoke(IPC.DESKTOP_TEST, request),
     start: (request: RemoteDesktopConfig) => ipcRenderer.invoke(IPC.DESKTOP_START, request),
     install: (request: RemoteDesktopConfig) => ipcRenderer.invoke(IPC.DESKTOP_INSTALL, request),
-    tunnel: (request: RemoteDesktopConfig) => ipcRenderer.invoke(IPC.DESKTOP_TUNNEL, request)
+    tunnel: (request: RemoteDesktopConfig) => ipcRenderer.invoke(IPC.DESKTOP_TUNNEL, request),
+    openClient: (request: RemoteDesktopConfig) => ipcRenderer.invoke(IPC.DESKTOP_OPEN_CLIENT, request)
   },
   terminals: {
     create: (request: TerminalCreateRequest) => ipcRenderer.invoke(IPC.TERMINAL_CREATE, request),

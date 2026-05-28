@@ -1,8 +1,8 @@
 {
   "name": "remote-control-workspace",
   "private": true,
-  "version": "0.1.0",
-  "description": "Self-hosted remote SSH and terminal manager MVP.",
+  "version": "0.2.0",
+  "description": "Self-hosted remote SSH, file transfer, and desktop manager.",
   "workspaces": [
     "apps/*"
   ],

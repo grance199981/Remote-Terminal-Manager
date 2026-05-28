@@ -78,14 +78,24 @@ export interface OperationResult {
   message: string;
 }
 
+export type RemoteDesktopBackend = "novnc" | "xrdp" | "rustdesk" | "moonlight";
+
 export interface RemoteDesktopConfig {
   deviceId: string;
+  backend?: RemoteDesktopBackend;
   password?: string;
   noVncPort: number;
   vncDisplay: number;
   width: number;
   height: number;
   depth: number;
+  rdpPort?: number;
+  rustDeskId?: string;
+  rustDeskPath?: string;
+  moonlightPath?: string;
+  moonlightApp?: string;
+  moonlightFps?: number;
+  moonlightBitrateKbps?: number;
 }
 
 export interface RemoteDesktopStatus {

@@ -25,6 +25,7 @@ import {
 } from "./fileTransfer.js";
 import {
   installRemoteDesktopDependencies,
+  openRemoteDesktopClient,
   openRemoteDesktopTunnel,
   startRemoteDesktop,
   testRemoteDesktop
@@ -137,6 +138,10 @@ function registerIpc() {
   ipcMain.handle(IPC.DESKTOP_TUNNEL, async (_event, request: RemoteDesktopConfig) => {
     const device = await requireSshDevice(request.deviceId);
     return openRemoteDesktopTunnel(device, request);
+  });
+  ipcMain.handle(IPC.DESKTOP_OPEN_CLIENT, async (_event, request: RemoteDesktopConfig) => {
+    const device = await requireSshDevice(request.deviceId);
+    return openRemoteDesktopClient(device, request);
   });
 
   ipcMain.handle(IPC.TERMINAL_CREATE, async (_event, request: TerminalCreateRequest) => {

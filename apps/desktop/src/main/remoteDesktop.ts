@@ -1,10 +1,13 @@
 import { Client } from "ssh2";
 import { readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
+import { spawn } from "node:child_process";
 import http from "node:http";
 import net from "node:net";
 import { randomUUID } from "node:crypto";
 import type {
   Device,
+  OperationResult,
   RemoteDesktopConfig,
   RemoteDesktopStartResult,
   RemoteDesktopStatus
@@ -86,6 +89,56 @@ export async function installRemoteDesktopDependencies(
   const output = await execSsh(device, request.password, command, request.password ? `${request.password}\n` : undefined);
   const startResult = await startRemoteDesktop(device, request);
   return { ...startResult, output: [output, startResult.output].filter(Boolean).join("\n\n") };
+}
+
+export async function openRemoteDesktopClient(
+  device: Device,
+  request: RemoteDesktopConfig
+): Promise<OperationResult> {
+  const host = requireHost(device);
+  const backend = request.backend ?? "xrdp";
+
+  if (backend === "xrdp") {
+    const port = normalizePort(request.rdpPort ?? 3389, 3389);
+    launchDetached("mstsc.exe", [`/v:${host}:${port}`]);
+    return {
+      ok: true,
+      message: `Opened Microsoft Remote Desktop: ${host}:${port}. On Ubuntu install and enable xrdp first.`
+    };
+  }
+
+  if (backend === "rustdesk") {
+    const exe = resolveExistingPath(request.rustDeskPath, [
+      "C:\\Program Files\\RustDesk\\rustdesk.exe",
+      "C:\\Program Files (x86)\\RustDesk\\rustdesk.exe",
+      "rustdesk.exe"
+    ]);
+    const args = request.rustDeskId?.trim() ? [request.rustDeskId.trim()] : [];
+    launchDetached(exe, args);
+    return {
+      ok: true,
+      message: request.rustDeskId?.trim()
+        ? `Opened RustDesk for device ID ${request.rustDeskId.trim()}.`
+        : "Opened RustDesk. Enter the remote RustDesk ID in the client."
+    };
+  }
+
+  if (backend === "moonlight") {
+    const exe = resolveExistingPath(request.moonlightPath, [
+      "C:\\Program Files\\Moonlight Game Streaming\\Moonlight.exe",
+      "C:\\Program Files (x86)\\Moonlight Game Streaming\\Moonlight.exe",
+      "Moonlight.exe"
+    ]);
+    const appName = request.moonlightApp?.trim() || "Desktop";
+    const args = ["stream", host, appName];
+    launchDetached(exe, args);
+    return {
+      ok: true,
+      message: `Opened Moonlight stream request: ${host} / ${appName}. Pair Moonlight with Sunshine first.`
+    };
+  }
+
+  return { ok: false, message: "noVNC is embedded in the app; use Connect/Reconnect instead." };
 }
 
 export async function openRemoteDesktopTunnel(
@@ -495,6 +548,24 @@ function waitForHttpOk(url: string, timeoutMs: number): Promise<void> {
     });
     request.once("error", reject);
   });
+}
+
+function launchDetached(command: string, args: string[]) {
+  const child = spawn(command, args, {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: false
+  });
+  child.unref();
+}
+
+function resolveExistingPath(preferred: string | undefined, candidates: string[]) {
+  if (preferred?.trim()) return preferred.trim();
+  for (const candidate of candidates) {
+    if (candidate.endsWith(".exe") && candidate.includes(":") && !existsSync(candidate)) continue;
+    return candidate;
+  }
+  return candidates[candidates.length - 1];
 }
 
 function buildNoVncUrl(host: string, port: number) {

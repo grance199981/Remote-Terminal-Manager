@@ -13,6 +13,7 @@ export const IPC = {
   DESKTOP_START: "desktop:start",
   DESKTOP_INSTALL: "desktop:install",
   DESKTOP_TUNNEL: "desktop:tunnel",
+  DESKTOP_OPEN_CLIENT: "desktop:open-client",
   TERMINAL_CREATE: "terminal:create",
   TERMINAL_INPUT: "terminal:input",
   TERMINAL_RESIZE: "terminal:resize",
