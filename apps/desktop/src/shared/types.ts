@@ -34,7 +34,6 @@ export interface DeviceConnectionTestResult {
   port: number;
   elapsedMs: number;
   message: string;
-  conflict?: boolean;
 }
 
 export interface FileEntry {

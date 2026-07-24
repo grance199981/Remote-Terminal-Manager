@@ -311,7 +311,36 @@ function sftpReaddir(sftp: SFTPWrapper, target: string) {
 
 function sftpFastPut(sftp: SFTPWrapper, localPath: string, remotePath: string) {
   return new Promise<void>((resolve, reject) => {
-    sftp.fastPut(localPath, remotePath, (error) => (error ? reject(error) : resolve()));
+    // A small concurrency is more reliable with restrictive SFTP servers than
+    // ssh2's default of 64 concurrent write requests.
+    const idleTimeoutMs = 60_000;
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    };
+    const armIdleTimeout = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        finish(new Error(`SFTP upload stalled for 60 seconds: ${localPath} -> ${remotePath}`));
+      }, idleTimeoutMs);
+    };
+
+    armIdleTimeout();
+    sftp.fastPut(
+      localPath,
+      remotePath,
+      {
+        concurrency: 4,
+        chunkSize: 32 * 1024,
+        step: () => armIdleTimeout()
+      },
+      (error) => finish(error ?? undefined)
+    );
   });
 }
 
