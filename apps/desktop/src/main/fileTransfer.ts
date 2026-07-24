@@ -60,7 +60,7 @@ export async function listRemoteFiles(device: Device, request: SftpListRequest):
 
     return {
       path: remotePath,
-      parent: remotePath === "/" ? "/" : posixPath.dirname(remotePath),
+      parent: remotePath === "/" || remotePath === "." ? undefined : posixPath.dirname(remotePath),
       entries: sortEntries(entries)
     };
   });
@@ -116,13 +116,16 @@ export async function deleteRemote(device: Device, request: SftpPathRequest): Pr
   });
 }
 
-function defaultRemotePath(device: Device): string {
-  return device.username ? `/home/${device.username}` : "/";
+function defaultRemotePath(_device: Device): string {
+  // An SFTP account may be chrooted or use a nonstandard home directory. The
+  // only portable initial location is its current SFTP directory (".").
+  return ".";
 }
 
 function normalizeRemotePath(value: string): string {
-  const normalized = posixPath.normalize(value || "/");
-  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+  // Keep relative paths relative: forcing a leading slash breaks chrooted and
+  // restricted SFTP servers, where only "." and its descendants are valid.
+  return posixPath.normalize(value.trim() || ".");
 }
 
 async function withSftp<T>(
@@ -235,11 +238,12 @@ async function downloadDirectory(sftp: SFTPWrapper, remoteDir: string, localDir:
 
 async function ensureRemoteDir(sftp: SFTPWrapper, remoteDir: string): Promise<void> {
   const normalized = normalizeRemotePath(remoteDir);
-  if (normalized === "/") return;
-  const parts = normalized.split("/").filter(Boolean);
-  let current = "";
+  if (normalized === "/" || normalized === ".") return;
+  const absolute = normalized.startsWith("/");
+  const parts = normalized.split("/").filter((part) => Boolean(part) && part !== ".");
+  let current = absolute ? "/" : "";
   for (const part of parts) {
-    current += `/${part}`;
+    current = current ? posixPath.join(current, part) : part;
     try {
       const attrs = await sftpLstat(sftp, current);
       if (statType(attrs) !== "directory") throw new Error(`Remote path exists and is not a directory: ${current}`);

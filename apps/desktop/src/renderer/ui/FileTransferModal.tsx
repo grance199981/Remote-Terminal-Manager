@@ -31,7 +31,8 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
   const [password, setPassword] = useState("");
   const [authenticated, setAuthenticated] = useState(device.authType !== "password");
   const [localPath, setLocalPath] = useState("");
-  const [remotePath, setRemotePath] = useState(`/home/${device.username ?? ""}`);
+  // Start from the SFTP working directory. It is portable across chrooted servers.
+  const [remotePath, setRemotePath] = useState(".");
   const [localList, setLocalList] = useState<FileListResponse | null>(null);
   const [remoteList, setRemoteList] = useState<FileListResponse | null>(null);
   const [selectedLocal, setSelectedLocal] = useState<FileEntry | null>(null);
