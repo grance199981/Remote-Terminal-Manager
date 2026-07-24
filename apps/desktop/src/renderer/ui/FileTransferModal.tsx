@@ -13,6 +13,9 @@ const UI = {
   local: "\u672c\u673a",
   remote: "\u8fdc\u7a0b",
   refresh: "\u5237\u65b0",
+  parentFolder: "\u4e0a\u7ea7\u76ee\u5f55",
+  openSelectedFolder: "\u6253\u5f00\u6240\u9009\u76ee\u5f55",
+  transferHint: "\u53cc\u51fb\u76ee\u5f55\u6216\u4f7f\u7528\u6253\u5f00\u6240\u9009\u76ee\u5f55\u8fdb\u5165\uff1b\u4f20\u8f93\u9047\u5230\u540c\u540d\u76ee\u6807\u65f6\u5fc5\u987b\u786e\u8ba4\u8986\u76d6\u3002",
   loadedRemote: "\u5df2\u8f7d\u5165\u8fdc\u7a0b\u76ee\u5f55",
   drives: "\u76d8\u7b26",
   uploaded: "\u4e0a\u4f20\u5b8c\u6210",
@@ -63,7 +66,7 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
     }
   }
 
-  async function loadRemote(nextPath: string) {
+  async function loadRemote(nextPath: string, announce = true) {
     try {
       setError(null);
       setBusy(true);
@@ -71,7 +74,7 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
       setRemoteList(list);
       setRemotePath(list.path);
       setSelectedRemote(null);
-      setMessage(`${UI.loadedRemote}: ${list.path}`);
+      if (announce) setMessage(`${UI.loadedRemote}: ${list.path}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -87,19 +90,28 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
 
   async function uploadSelected() {
     if (!selectedLocal || selectedLocal.type === "other") return;
+    const target = joinRemote(remotePath, selectedLocal.name);
     try {
       setBusy(true);
       setError(null);
-      const target = joinRemote(remotePath, selectedLocal.name);
-      const result = await window.remoteTerminal.files.upload({
-        ...auth,
-        localPath: selectedLocal.path,
-        remotePath: target
-      });
-      setMessage(`${UI.uploaded}: ${result.message}`);
-      await loadRemote(remotePath);
+      setMessage(`\u6b63\u5728\u4e0a\u4f20: ${selectedLocal.path} -> ${target}`);
+      let result = await window.remoteTerminal.files.upload({ ...auth, localPath: selectedLocal.path, remotePath: target });
+      if (result.conflict) {
+        const kind = selectedLocal.type === "directory"
+          ? "\u5c06\u5408\u5e76\u76ee\u5f55\uff0c\u4e14\u540c\u540d\u6587\u4ef6\u4f1a\u88ab\u8986\u76d6"
+          : "\u5c06\u8986\u76d6\u76ee\u6807\u6587\u4ef6";
+        if (!confirm(`\u8fdc\u7a0b\u76ee\u6807\u5df2\u5b58\u5728: ${target}\n${kind}\n\n\u662f\u5426\u7ee7\u7eed?`)) {
+          setMessage(`\u5df2\u53d6\u6d88\u4e0a\u4f20: ${selectedLocal.name}`);
+          return;
+        }
+        setMessage(`\u6b63\u5728\u8986\u76d6\u4e0a\u4f20: ${selectedLocal.path} -> ${target}`);
+        result = await window.remoteTerminal.files.upload({ ...auth, localPath: selectedLocal.path, remotePath: target, overwrite: true });
+      }
+      if (!result.ok) throw new Error(result.message);
+      setMessage(`\u4e0a\u4f20\u6210\u529f: ${result.message}`);
+      await loadRemote(remotePath, false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(`\u4e0a\u4f20\u5931\u8d25: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
     }
@@ -107,24 +119,32 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
 
   async function downloadSelected() {
     if (!selectedRemote || selectedRemote.type === "other") return;
+    const target = joinLocal(localPath, selectedRemote.name);
     try {
       setBusy(true);
       setError(null);
-      const target = joinLocal(localPath, selectedRemote.name);
-      const result = await window.remoteTerminal.files.download({
-        ...auth,
-        localPath: target,
-        remotePath: selectedRemote.path
-      });
-      setMessage(`${UI.downloaded}: ${result.message}`);
+      setMessage(`\u6b63\u5728\u4e0b\u8f7d: ${selectedRemote.path} -> ${target}`);
+      let result = await window.remoteTerminal.files.download({ ...auth, localPath: target, remotePath: selectedRemote.path });
+      if (result.conflict) {
+        const kind = selectedRemote.type === "directory"
+          ? "\u5c06\u5408\u5e76\u76ee\u5f55\uff0c\u4e14\u540c\u540d\u6587\u4ef6\u4f1a\u88ab\u8986\u76d6"
+          : "\u5c06\u8986\u76d6\u672c\u673a\u6587\u4ef6";
+        if (!confirm(`\u672c\u673a\u76ee\u6807\u5df2\u5b58\u5728: ${target}\n${kind}\n\n\u662f\u5426\u7ee7\u7eed?`)) {
+          setMessage(`\u5df2\u53d6\u6d88\u4e0b\u8f7d: ${selectedRemote.name}`);
+          return;
+        }
+        setMessage(`\u6b63\u5728\u8986\u76d6\u4e0b\u8f7d: ${selectedRemote.path} -> ${target}`);
+        result = await window.remoteTerminal.files.download({ ...auth, localPath: target, remotePath: selectedRemote.path, overwrite: true });
+      }
+      if (!result.ok) throw new Error(result.message);
+      setMessage(`\u4e0b\u8f7d\u6210\u529f: ${result.message}`);
       await loadLocal(localPath);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(`\u4e0b\u8f7d\u5931\u8d25: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
     }
   }
-
   async function makeRemoteDir() {
     const name = prompt(UI.mkdirPrompt);
     if (!name) return;
@@ -188,6 +208,8 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
               <button className="secondary" onClick={() => void makeRemoteDir()} disabled={busy}>{UI.mkdir}</button>
               <button className="danger" onClick={() => void deleteSelectedRemote()} disabled={busy || !selectedRemote}>{UI.deleteRemote}</button>
             </div>
+
+            <p className="transfer-hint">{UI.transferHint}</p>
 
             <div className="file-panels">
               <FilePanel
@@ -269,8 +291,9 @@ function FilePanel({
         </div>
       ) : null}
       <div className="pathbar">
-        <button className="secondary" onClick={onParent}>..</button>
+        <button className="secondary" onClick={onParent}>{UI.parentFolder}</button>
         <input value={pathValue} onChange={(event) => onPathChange(event.target.value)} onKeyDown={(event) => event.key === "Enter" && onGo()} />
+        <button className="secondary" onClick={() => selected?.type === "directory" && onOpen(selected)} disabled={selected?.type !== "directory"}>{UI.openSelectedFolder}</button>
         <button onClick={onGo}>{UI.refresh}</button>
       </div>
       <div className="file-list">

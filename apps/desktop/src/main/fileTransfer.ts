@@ -70,29 +70,35 @@ export async function uploadFile(device: Device, request: SftpTransferRequest): 
   return withSftp(device, request, async (sftp) => {
     const localStats = await stat(request.localPath);
     const remotePath = normalizeRemotePath(request.remotePath);
+    if (!request.overwrite && await remotePathExists(sftp, remotePath)) {
+      return { ok: false, conflict: true, message: `Remote target already exists: ${remotePath}` };
+    }
     let count = 0;
     if (localStats.isDirectory()) {
       count = await uploadDirectory(sftp, request.localPath, remotePath);
-      return { ok: true, message: `Upload directory completed (${count} files)` };
+      return { ok: true, message: `Upload completed: ${remotePath} (${count} files)` };
     }
     await ensureRemoteDir(sftp, posixPath.dirname(remotePath));
     await sftpFastPut(sftp, request.localPath, remotePath);
-    return { ok: true, message: "Upload file completed" };
+    return { ok: true, message: `Upload completed: ${remotePath}` };
   });
 }
 
 export async function downloadFile(device: Device, request: SftpTransferRequest): Promise<OperationResult> {
   return withSftp(device, request, async (sftp) => {
     const remotePath = normalizeRemotePath(request.remotePath);
+    if (!request.overwrite && await localPathExists(request.localPath)) {
+      return { ok: false, conflict: true, message: `Local target already exists: ${request.localPath}` };
+    }
     const attrs = await sftpLstat(sftp, remotePath);
     let count = 0;
     if (statType(attrs) === "directory") {
       count = await downloadDirectory(sftp, remotePath, request.localPath);
-      return { ok: true, message: `Download directory completed (${count} files)` };
+      return { ok: true, message: `Download completed: ${request.localPath} (${count} files)` };
     }
     await mkdir(path.dirname(request.localPath), { recursive: true });
     await sftpFastGet(sftp, remotePath, request.localPath);
-    return { ok: true, message: "Download file completed" };
+    return { ok: true, message: `Download completed: ${request.localPath}` };
   });
 }
 
@@ -195,6 +201,27 @@ function statType(attrs: Stats): FileEntry["type"] {
   if (attrs.isDirectory()) return "directory";
   if (attrs.isFile()) return "file";
   return "other";
+}
+
+async function remotePathExists(sftp: SFTPWrapper, remotePath: string): Promise<boolean> {
+  try {
+    await sftpLstat(sftp, remotePath);
+    return true;
+  } catch (error) {
+    if (isMissingPathError(error)) return false;
+    throw error;
+  }
+}
+
+async function localPathExists(localPath: string): Promise<boolean> {
+  try {
+    await stat(localPath);
+    return true;
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    if (code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 async function uploadDirectory(sftp: SFTPWrapper, localDir: string, remoteDir: string): Promise<number> {

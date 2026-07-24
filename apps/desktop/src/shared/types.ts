@@ -34,6 +34,7 @@ export interface DeviceConnectionTestResult {
   port: number;
   elapsedMs: number;
   message: string;
+  conflict?: boolean;
 }
 
 export interface FileEntry {
@@ -67,6 +68,8 @@ export interface SftpListRequest extends SftpAuthRequest {
 export interface SftpTransferRequest extends SftpAuthRequest {
   localPath: string;
   remotePath: string;
+  /** Explicit consent is required before replacing an existing target. */
+  overwrite?: boolean;
 }
 
 export interface SftpPathRequest extends SftpAuthRequest {
@@ -76,6 +79,7 @@ export interface SftpPathRequest extends SftpAuthRequest {
 export interface OperationResult {
   ok: boolean;
   message: string;
+  conflict?: boolean;
 }
 
 export type RemoteDesktopBackend = "novnc" | "xrdp" | "rustdesk" | "moonlight";
