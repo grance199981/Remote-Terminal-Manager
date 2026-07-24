@@ -10,6 +10,7 @@ import type {
   RemoteDesktopStatus,
   SftpListRequest,
   SftpPathRequest,
+  SftpProgressEvent,
   SftpTransferRequest,
   TerminalCreateRequest,
   TerminalCreateResponse,
@@ -43,6 +44,7 @@ declare global {
         download(request: SftpTransferRequest): Promise<OperationResult>;
         mkdir(request: SftpPathRequest): Promise<OperationResult>;
         deleteRemote(request: SftpPathRequest): Promise<OperationResult>;
+        onProgress(callback: (event: SftpProgressEvent) => void): () => void;
       };
       desktop: {
         test(request: RemoteDesktopConfig): Promise<RemoteDesktopStatus>;

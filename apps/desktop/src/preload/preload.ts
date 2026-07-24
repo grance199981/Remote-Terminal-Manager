@@ -6,6 +6,7 @@ import type {
   RemoteDesktopConfig,
   SftpListRequest,
   SftpPathRequest,
+  SftpProgressEvent,
   SftpTransferRequest,
   TerminalCreateRequest,
   TerminalDataEvent,
@@ -26,7 +27,12 @@ contextBridge.exposeInMainWorld("remoteTerminal", {
     upload: (request: SftpTransferRequest) => ipcRenderer.invoke(IPC.SFTP_UPLOAD, request),
     download: (request: SftpTransferRequest) => ipcRenderer.invoke(IPC.SFTP_DOWNLOAD, request),
     mkdir: (request: SftpPathRequest) => ipcRenderer.invoke(IPC.SFTP_MKDIR, request),
-    deleteRemote: (request: SftpPathRequest) => ipcRenderer.invoke(IPC.SFTP_DELETE, request)
+    deleteRemote: (request: SftpPathRequest) => ipcRenderer.invoke(IPC.SFTP_DELETE, request),
+    onProgress: (callback: (event: SftpProgressEvent) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, event: SftpProgressEvent) => callback(event);
+      ipcRenderer.on(IPC.SFTP_PROGRESS, handler);
+      return () => ipcRenderer.removeListener(IPC.SFTP_PROGRESS, handler);
+    }
   },
   desktop: {
     test: (request: RemoteDesktopConfig) => ipcRenderer.invoke(IPC.DESKTOP_TEST, request),

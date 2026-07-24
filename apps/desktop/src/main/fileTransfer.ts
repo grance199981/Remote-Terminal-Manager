@@ -14,8 +14,11 @@ import type {
   SftpAuthRequest,
   SftpListRequest,
   SftpPathRequest,
+  SftpProgressEvent,
   SftpTransferRequest
 } from "../shared/types.js";
+
+type UploadProgressCallback = (progress: Omit<SftpProgressEvent, "deviceId">) => void;
 
 export async function listLocalFiles(request: LocalListRequest): Promise<FileListResponse> {
   const requestedPath = request.path?.trim() || os.homedir();
@@ -66,7 +69,7 @@ export async function listRemoteFiles(device: Device, request: SftpListRequest):
   });
 }
 
-export async function uploadFile(device: Device, request: SftpTransferRequest): Promise<OperationResult> {
+export async function uploadFile(device: Device, request: SftpTransferRequest, onProgress?: UploadProgressCallback): Promise<OperationResult> {
   return withSftp(device, request, async (sftp) => {
     const localStats = await stat(request.localPath);
     const remotePath = normalizeRemotePath(request.remotePath);
@@ -75,11 +78,15 @@ export async function uploadFile(device: Device, request: SftpTransferRequest): 
     }
     let count = 0;
     if (localStats.isDirectory()) {
-      count = await uploadDirectory(sftp, request.localPath, remotePath);
+      const tracker = { completedFiles: 0 };
+      count = await uploadDirectory(sftp, request.localPath, remotePath, onProgress, tracker);
       return { ok: true, message: `Upload completed: ${remotePath} (${count} files)` };
     }
     await ensureRemoteDir(sftp, posixPath.dirname(remotePath));
-    await sftpFastPut(sftp, request.localPath, remotePath);
+    await sftpFastPut(sftp, request.localPath, remotePath, (transferredBytes, totalBytes) => {
+      onProgress?.({ direction: "upload", path: remotePath, completedFiles: 0, transferredBytes, totalBytes });
+    });
+    onProgress?.({ direction: "upload", path: remotePath, completedFiles: 1, transferredBytes: localStats.size, totalBytes: localStats.size });
     return { ok: true, message: `Upload completed: ${remotePath}` };
   });
 }
@@ -224,7 +231,13 @@ async function localPathExists(localPath: string): Promise<boolean> {
   }
 }
 
-async function uploadDirectory(sftp: SFTPWrapper, localDir: string, remoteDir: string): Promise<number> {
+async function uploadDirectory(
+  sftp: SFTPWrapper,
+  localDir: string,
+  remoteDir: string,
+  onProgress?: UploadProgressCallback,
+  tracker = { completedFiles: 0 }
+): Promise<number> {
   await ensureRemoteDir(sftp, remoteDir);
   const items = await readdir(localDir, { withFileTypes: true });
   let count = 0;
@@ -232,17 +245,24 @@ async function uploadDirectory(sftp: SFTPWrapper, localDir: string, remoteDir: s
     const localChild = path.join(localDir, item.name);
     const remoteChild = posixPath.join(remoteDir, item.name);
     if (item.isDirectory()) {
-      count += await uploadDirectory(sftp, localChild, remoteChild);
+      count += await uploadDirectory(sftp, localChild, remoteChild, onProgress, tracker);
     } else if (item.isFile()) {
-      await sftpFastPut(sftp, localChild, remoteChild).catch((error) => {
+      let transferredBytes = 0;
+      let totalBytes = 0;
+      await sftpFastPut(sftp, localChild, remoteChild, (transferred, total) => {
+        transferredBytes = transferred;
+        totalBytes = total;
+        onProgress?.({ direction: "upload", path: remoteChild, completedFiles: tracker.completedFiles, transferredBytes, totalBytes });
+      }).catch((error) => {
         throw new Error(`Upload failed: ${localChild} -> ${remoteChild}: ${getErrorMessage(error)}`);
       });
       count += 1;
+      tracker.completedFiles += 1;
+      onProgress?.({ direction: "upload", path: remoteChild, completedFiles: tracker.completedFiles, transferredBytes: totalBytes, totalBytes });
     }
   }
   return count;
 }
-
 async function downloadDirectory(sftp: SFTPWrapper, remoteDir: string, localDir: string): Promise<number> {
   await mkdir(localDir, { recursive: true });
   const items = await sftpReaddir(sftp, remoteDir);
@@ -309,13 +329,14 @@ function sftpReaddir(sftp: SFTPWrapper, target: string) {
   });
 }
 
-function sftpFastPut(sftp: SFTPWrapper, localPath: string, remotePath: string) {
+function sftpFastPut(sftp: SFTPWrapper, localPath: string, remotePath: string, onProgress?: (transferredBytes: number, totalBytes: number) => void) {
   return new Promise<void>((resolve, reject) => {
     // A small concurrency is more reliable with restrictive SFTP servers than
     // ssh2's default of 64 concurrent write requests.
     const idleTimeoutMs = 60_000;
     let settled = false;
     let timer: NodeJS.Timeout | undefined;
+    let lastProgressAt = 0;
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
@@ -337,7 +358,14 @@ function sftpFastPut(sftp: SFTPWrapper, localPath: string, remotePath: string) {
       {
         concurrency: 4,
         chunkSize: 32 * 1024,
-        step: () => armIdleTimeout()
+        step: (transferredBytes, _chunkBytes, totalBytes) => {
+          armIdleTimeout();
+          const now = Date.now();
+          if (now - lastProgressAt >= 200 || transferredBytes >= totalBytes) {
+            lastProgressAt = now;
+            onProgress?.(transferredBytes, totalBytes);
+          }
+        }
       },
       (error) => finish(error ?? undefined)
     );

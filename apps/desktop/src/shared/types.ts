@@ -75,6 +75,15 @@ export interface SftpPathRequest extends SftpAuthRequest {
   path: string;
 }
 
+export interface SftpProgressEvent {
+  deviceId: string;
+  direction: "upload";
+  path: string;
+  completedFiles: number;
+  transferredBytes: number;
+  totalBytes: number;
+}
+
 export interface OperationResult {
   ok: boolean;
   message: string;

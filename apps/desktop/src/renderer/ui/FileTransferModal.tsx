@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { Device, FileEntry, FileListResponse } from "../../shared/types";
+import type { Device, FileEntry, FileListResponse, SftpProgressEvent } from "../../shared/types";
 
 const UI = {
   titlePrefix: "\u6587\u4ef6\u4f20\u8f93",
@@ -53,6 +53,12 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
   useEffect(() => {
     if (authenticated) void loadRemote(remotePath);
   }, [authenticated]);
+
+  useEffect(() => window.remoteTerminal.files.onProgress((progress: SftpProgressEvent) => {
+    if (progress.deviceId !== device.id || progress.direction !== "upload") return;
+    const percent = progress.totalBytes > 0 ? Math.floor((progress.transferredBytes / progress.totalBytes) * 100) : 0;
+    setMessage(`\u6b63\u5728\u4e0a\u4f20 (${progress.completedFiles} \u4e2a\u6587\u4ef6\u5df2\u5b8c\u6210): ${progress.path} ${percent}%`);
+  }), [device.id]);
 
   async function loadLocal(nextPath?: string) {
     try {

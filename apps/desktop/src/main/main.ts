@@ -106,9 +106,11 @@ function registerIpc() {
     const device = await requireSshDevice(request.deviceId);
     return listRemoteFiles(device, request);
   });
-  ipcMain.handle(IPC.SFTP_UPLOAD, async (_event, request: SftpTransferRequest) => {
+  ipcMain.handle(IPC.SFTP_UPLOAD, async (event, request: SftpTransferRequest) => {
     const device = await requireSshDevice(request.deviceId);
-    return uploadFile(device, request);
+    return uploadFile(device, request, (progress) => {
+      event.sender.send(IPC.SFTP_PROGRESS, { deviceId: device.id, ...progress });
+    });
   });
   ipcMain.handle(IPC.SFTP_DOWNLOAD, async (_event, request: SftpTransferRequest) => {
     const device = await requireSshDevice(request.deviceId);

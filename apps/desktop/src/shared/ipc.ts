@@ -9,6 +9,7 @@ export const IPC = {
   SFTP_DOWNLOAD: "sftp:download",
   SFTP_MKDIR: "sftp:mkdir",
   SFTP_DELETE: "sftp:delete",
+  SFTP_PROGRESS: "sftp:progress",
   DESKTOP_TEST: "desktop:test",
   DESKTOP_START: "desktop:start",
   DESKTOP_INSTALL: "desktop:install",
