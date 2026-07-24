@@ -32,6 +32,10 @@ declare global {
 
   interface Window {
     remoteTerminal: {
+      clipboard: {
+        readText(): Promise<string>;
+        writeText(text: string): Promise<void>;
+      };
       devices: {
         list(): Promise<Device[]>;
         save(device: DeviceDraft): Promise<Device>;

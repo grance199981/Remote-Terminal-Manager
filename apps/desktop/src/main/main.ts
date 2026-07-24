@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, session, shell } from "electron";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,6 +102,8 @@ function registerIpc() {
   ipcMain.handle(IPC.DEVICES_SAVE, (_event, device: DeviceDraft) => saveDevice(device));
   ipcMain.handle(IPC.DEVICES_DELETE, (_event, id: string) => deleteDevice(id));
   ipcMain.handle(IPC.DEVICES_TEST, async (_event, id: string) => testDeviceConnection(id));
+  ipcMain.handle(IPC.CLIPBOARD_READ, () => clipboard.readText());
+  ipcMain.handle(IPC.CLIPBOARD_WRITE, (_event, text: string) => clipboard.writeText(text));
 
   ipcMain.handle(IPC.LOCAL_LIST, (_event, request: LocalListRequest) => listLocalFiles(request));
   ipcMain.handle(IPC.LOCAL_DELETE, (_event, request: LocalPathRequest) => deleteLocalFile(request));

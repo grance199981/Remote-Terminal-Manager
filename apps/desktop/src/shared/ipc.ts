@@ -3,6 +3,8 @@ export const IPC = {
   DEVICES_SAVE: "devices:save",
   DEVICES_DELETE: "devices:delete",
   DEVICES_TEST: "devices:test",
+  CLIPBOARD_READ: "clipboard:read",
+  CLIPBOARD_WRITE: "clipboard:write",
   LOCAL_LIST: "local:list",
   LOCAL_DELETE: "local:delete",
   SFTP_LIST: "sftp:list",

@@ -127,6 +127,34 @@ function TerminalView({ tab, active }: { tab: TerminalTab; active: boolean }) {
     terminal.writeln(`\x1b[36m${tab.title}\x1b[0m ${TEXT.started}`);
     terminal.onData((data) => window.remoteTerminal.terminals.input(tab.id, data));
 
+    const copySelection = async () => {
+      const selection = terminal.getSelection();
+      if (selection) await window.remoteTerminal.clipboard.writeText(selection);
+    };
+    const pasteClipboard = async () => {
+      const text = await window.remoteTerminal.clipboard.readText();
+      if (text) window.remoteTerminal.terminals.input(tab.id, text);
+    };
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type !== "keydown") return true;
+      const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.key.toLowerCase() === "c" && terminal.hasSelection()) {
+        void copySelection();
+        return false;
+      }
+      if ((modifier && event.key.toLowerCase() === "v") || (event.shiftKey && event.key === "Insert")) {
+        void pasteClipboard();
+        return false;
+      }
+      return true;
+    });
+    const handleContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+      if (terminal.hasSelection()) void copySelection();
+      else void pasteClipboard();
+    };
+    containerRef.current.addEventListener("contextmenu", handleContextMenu);
+
     const unsubscribeData = window.remoteTerminal.terminals.onData((event) => {
       if (event.id === tab.id) terminal.write(event.data);
     });
@@ -147,6 +175,7 @@ function TerminalView({ tab, active }: { tab: TerminalTab; active: boolean }) {
 
     return () => {
       resizeObserver.disconnect();
+      containerRef.current?.removeEventListener("contextmenu", handleContextMenu);
       unsubscribeData();
       unsubscribeExit();
       unsubscribeError();

@@ -16,6 +16,10 @@ import type {
 } from "../shared/types.js";
 
 contextBridge.exposeInMainWorld("remoteTerminal", {
+  clipboard: {
+    readText: () => ipcRenderer.invoke(IPC.CLIPBOARD_READ),
+    writeText: (text: string) => ipcRenderer.invoke(IPC.CLIPBOARD_WRITE, text)
+  },
   devices: {
     list: () => ipcRenderer.invoke(IPC.DEVICES_LIST),
     save: (device: DeviceDraft) => ipcRenderer.invoke(IPC.DEVICES_SAVE, device),
