@@ -4,6 +4,7 @@ export const IPC = {
   DEVICES_DELETE: "devices:delete",
   DEVICES_TEST: "devices:test",
   LOCAL_LIST: "local:list",
+  LOCAL_DELETE: "local:delete",
   SFTP_LIST: "sftp:list",
   SFTP_UPLOAD: "sftp:upload",
   SFTP_DOWNLOAD: "sftp:download",

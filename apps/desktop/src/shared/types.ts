@@ -48,6 +48,10 @@ export interface LocalListRequest {
   path?: string;
 }
 
+export interface LocalPathRequest {
+  path: string;
+}
+
 export interface FileListResponse {
   path: string;
   parent?: string;

@@ -3,6 +3,7 @@ import { IPC } from "../shared/ipc.js";
 import type {
   DeviceDraft,
   LocalListRequest,
+  LocalPathRequest,
   RemoteDesktopConfig,
   SftpListRequest,
   SftpPathRequest,
@@ -23,6 +24,7 @@ contextBridge.exposeInMainWorld("remoteTerminal", {
   },
   files: {
     listLocal: (request: LocalListRequest) => ipcRenderer.invoke(IPC.LOCAL_LIST, request),
+    deleteLocal: (request: LocalPathRequest) => ipcRenderer.invoke(IPC.LOCAL_DELETE, request),
     listRemote: (request: SftpListRequest) => ipcRenderer.invoke(IPC.SFTP_LIST, request),
     upload: (request: SftpTransferRequest) => ipcRenderer.invoke(IPC.SFTP_UPLOAD, request),
     download: (request: SftpTransferRequest) => ipcRenderer.invoke(IPC.SFTP_DOWNLOAD, request),

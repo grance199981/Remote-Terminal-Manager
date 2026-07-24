@@ -4,6 +4,7 @@ import type {
   DeviceDraft,
   FileListResponse,
   LocalListRequest,
+  LocalPathRequest,
   OperationResult,
   RemoteDesktopConfig,
   RemoteDesktopStartResult,
@@ -39,6 +40,7 @@ declare global {
       };
       files: {
         listLocal(request: LocalListRequest): Promise<FileListResponse>;
+        deleteLocal(request: LocalPathRequest): Promise<OperationResult>;
         listRemote(request: SftpListRequest): Promise<FileListResponse>;
         upload(request: SftpTransferRequest): Promise<OperationResult>;
         download(request: SftpTransferRequest): Promise<OperationResult>;

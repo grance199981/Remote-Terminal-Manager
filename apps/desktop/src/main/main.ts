@@ -7,6 +7,7 @@ import type {
   DeviceConnectionTestResult,
   DeviceDraft,
   LocalListRequest,
+  LocalPathRequest,
   RemoteDesktopConfig,
   SftpListRequest,
   SftpPathRequest,
@@ -16,6 +17,7 @@ import type {
 } from "../shared/types.js";
 import { deleteDevice, listDevices, saveDevice } from "./deviceStore.js";
 import {
+  deleteLocalFile,
   deleteRemote,
   downloadFile,
   listLocalFiles,
@@ -102,6 +104,7 @@ function registerIpc() {
   ipcMain.handle(IPC.DEVICES_TEST, async (_event, id: string) => testDeviceConnection(id));
 
   ipcMain.handle(IPC.LOCAL_LIST, (_event, request: LocalListRequest) => listLocalFiles(request));
+  ipcMain.handle(IPC.LOCAL_DELETE, (_event, request: LocalPathRequest) => deleteLocalFile(request));
   ipcMain.handle(IPC.SFTP_LIST, async (_event, request: SftpListRequest) => {
     const device = await requireSshDevice(request.deviceId);
     return listRemoteFiles(device, request);

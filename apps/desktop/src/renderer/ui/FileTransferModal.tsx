@@ -9,6 +9,7 @@ const UI = {
   upload: "\u4e0a\u4f20\u6240\u9009",
   download: "\u4e0b\u8f7d\u6240\u9009",
   mkdir: "\u8fdc\u7a0b\u65b0\u5efa\u6587\u4ef6\u5939",
+  deleteLocal: "\u5220\u9664\u672c\u673a\u9879",
   deleteRemote: "\u5220\u9664\u8fdc\u7a0b\u9879",
   local: "\u672c\u673a",
   remote: "\u8fdc\u7a0b",
@@ -22,7 +23,8 @@ const UI = {
   downloaded: "\u4e0b\u8f7d\u5b8c\u6210",
   mkdirPrompt: "\u8f93\u5165\u8fdc\u7a0b\u6587\u4ef6\u5939\u540d\u79f0",
   deleteConfirmPrefix: "\u786e\u5b9a\u5220\u9664\u8fdc\u7a0b\u9879",
-  deleteConfirmSuffix: "\u975e\u7a7a\u6587\u4ef6\u5939\u4e0d\u4f1a\u88ab\u9012\u5f52\u5220\u9664\u3002"
+  deleteLocalConfirmPrefix: "\u786e\u5b9a\u5220\u9664\u672c\u673a\u9879",
+  deleteConfirmSuffix: "\u6587\u4ef6\u5939\u5c06\u88ab\u9012\u5f52\u6c38\u4e45\u5220\u9664\uff0c\u65e0\u6cd5\u64a4\u9500\u3002"
 };
 
 interface FileTransferModalProps {
@@ -166,14 +168,31 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
     }
   }
 
+  async function deleteSelectedLocal() {
+    if (!selectedLocal) return;
+    if (!confirm(`${UI.deleteLocalConfirmPrefix}: ${selectedLocal.name}? ${UI.deleteConfirmSuffix}`)) return;
+    try {
+      setBusy(true);
+      setError(null);
+      const result = await window.remoteTerminal.files.deleteLocal({ path: selectedLocal.path });
+      setMessage(`\u672c\u673a\u5220\u9664\u6210\u529f: ${result.message}`);
+      await loadLocal(localPath);
+    } catch (err) {
+      setError(`\u672c\u673a\u5220\u9664\u5931\u8d25: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deleteSelectedRemote() {
     if (!selectedRemote) return;
     if (!confirm(`${UI.deleteConfirmPrefix}: ${selectedRemote.name}? ${UI.deleteConfirmSuffix}`)) return;
     try {
       setBusy(true);
       setError(null);
-      await window.remoteTerminal.files.deleteRemote({ ...auth, path: selectedRemote.path });
-      await loadRemote(remotePath);
+      const result = await window.remoteTerminal.files.deleteRemote({ ...auth, path: selectedRemote.path });
+      setMessage(`\u8fdc\u7a0b\u5220\u9664\u6210\u529f: ${result.message}`);
+      await loadRemote(remotePath, false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -212,6 +231,7 @@ export function FileTransferModal({ device, onClose }: FileTransferModalProps) {
               <button onClick={() => void uploadSelected()} disabled={busy || !selectedLocal || selectedLocal.type === "other"}>{UI.upload}</button>
               <button onClick={() => void downloadSelected()} disabled={busy || !selectedRemote || selectedRemote.type === "other"}>{UI.download}</button>
               <button className="secondary" onClick={() => void makeRemoteDir()} disabled={busy}>{UI.mkdir}</button>
+              <button className="danger" onClick={() => void deleteSelectedLocal()} disabled={busy || !selectedLocal}>{UI.deleteLocal}</button>
               <button className="danger" onClick={() => void deleteSelectedRemote()} disabled={busy || !selectedRemote}>{UI.deleteRemote}</button>
             </div>
 

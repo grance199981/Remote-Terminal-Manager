@@ -1,6 +1,6 @@
 import { Client } from "ssh2";
 import type { SFTPWrapper, Stats } from "ssh2";
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +10,7 @@ import type {
   FileEntry,
   FileListResponse,
   LocalListRequest,
+  LocalPathRequest,
   OperationResult,
   SftpAuthRequest,
   SftpListRequest,
@@ -44,6 +45,15 @@ export async function listLocalFiles(request: LocalListRequest): Promise<FileLis
     roots: await listLocalRoots(),
     entries: sortEntries(entries)
   };
+}
+
+export async function deleteLocalFile(request: LocalPathRequest): Promise<OperationResult> {
+  const resolvedPath = path.resolve(request.path);
+  if (resolvedPath === path.parse(resolvedPath).root) {
+    throw new Error(`Refusing to delete local drive root: ${resolvedPath}`);
+  }
+  await rm(resolvedPath, { recursive: true, force: false });
+  return { ok: true, message: `Local item deleted: ${resolvedPath}` };
 }
 
 export async function listRemoteFiles(device: Device, request: SftpListRequest): Promise<FileListResponse> {
@@ -119,13 +129,11 @@ export async function mkdirRemote(device: Device, request: SftpPathRequest): Pro
 export async function deleteRemote(device: Device, request: SftpPathRequest): Promise<OperationResult> {
   return withSftp(device, request, async (sftp) => {
     const remotePath = normalizeRemotePath(request.path);
-    const attrs = await sftpLstat(sftp, remotePath);
-    if (statType(attrs) === "directory") {
-      await sftpRmdir(sftp, remotePath);
-    } else {
-      await sftpUnlink(sftp, remotePath);
+    if (remotePath === "/" || remotePath === ".") {
+      throw new Error("Refusing to delete the remote SFTP root");
     }
-    return { ok: true, message: "Remote item deleted" };
+    await deleteRemoteTree(sftp, remotePath);
+    return { ok: true, message: `Remote item deleted: ${remotePath}` };
   });
 }
 
@@ -281,6 +289,20 @@ async function downloadDirectory(sftp: SFTPWrapper, remoteDir: string, localDir:
     }
   }
   return count;
+}
+
+async function deleteRemoteTree(sftp: SFTPWrapper, remotePath: string): Promise<void> {
+  const attrs = await sftpLstat(sftp, remotePath);
+  if (statType(attrs) !== "directory") {
+    await sftpUnlink(sftp, remotePath);
+    return;
+  }
+  const items = await sftpReaddir(sftp, remotePath);
+  for (const item of items) {
+    if (item.filename === "." || item.filename === "..") continue;
+    await deleteRemoteTree(sftp, posixPath.join(remotePath, item.filename));
+  }
+  await sftpRmdir(sftp, remotePath);
 }
 
 async function ensureRemoteDir(sftp: SFTPWrapper, remoteDir: string): Promise<void> {
